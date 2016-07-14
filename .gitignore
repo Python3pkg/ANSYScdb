@@ -1,0 +1,17 @@
+# Compiled source #
+###################
+*.pyc
+*.c
+*.cpp
+*.so
+
+# OS generated files #
+######################
+.fuse_hidden*
+*~
+
+# Pip generated folders #
+#########################
+ANSYScdb.egg-info/
+build/
+dist/
