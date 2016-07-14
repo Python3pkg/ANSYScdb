@@ -4,6 +4,7 @@
 *.c
 *.cpp
 *.so
+*.o
 
 # OS generated files #
 ######################

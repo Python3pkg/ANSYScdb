@@ -39,10 +39,10 @@ Test installation with the following from Python
 
   from ANSYScdb import Tests
 
-  # Load and hexahedral beam
+  # Load a hexahedral beam from a cdb
   Tests.Load.HexBeam() # returns a cdb object
 
-  # Load and display a hexahedral beam
+  # Load and display the same beam
   Tests.Display.HexBeam() # returns a cdb object
 
 

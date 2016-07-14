@@ -3,9 +3,8 @@
 Setup.py for ANSYScdb
 
 """
-from distutils.core import setup
+from setuptools import setup, Extension
 from Cython.Distutils import build_ext
-from distutils.extension import Extension
 
 import numpy
 
@@ -15,7 +14,7 @@ setup(
     packages = ['ANSYScdb', 'ANSYScdb.Tests'],
 
     # Version
-    version='0.10',
+    version='0.10.1',
 
     description='Loads ANSYS cdb files',
     long_description=open('README.rst').read(),
