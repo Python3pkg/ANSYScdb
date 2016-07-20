@@ -44,7 +44,6 @@ def Parse(raw):
     cdef int [::1] etype = raw['etype']
     cdef int [::1] nnum = raw['nnum']
     
-    
     cdef int i, j, k
     cdef int nelem = elem.shape[0]
     cdef int nnode = nnum.shape[0]
@@ -729,7 +728,7 @@ def ParseForFEM(raw):
                 # Poulate midside nodes
                 for k in range(6):
                     # if it exists
-                    if elem[i, tetmidB[k]] != -1 and not midstored[elem[i, tetmidB[k]]]:
+                    if elem[i, tetmidB[k]] > 0 and not midstored[elem[i, tetmidB[k]]]:
                         
                         # Add its adjcent nodes to the index array tracker
                         midedgeind[midnode, 0] = numref[elem[i, typeBmidind[k][0]]]

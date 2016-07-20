@@ -709,8 +709,8 @@ def ParseForFEM(raw):
                 
                 # Poulate midside nodes
                 for k in range(6):
-                    # if it exists
-                    if elem[i, tetmidB[k]] != -1:
+                    # if it exists (isn't zero because ANSYS is weird) and hasn't been
+                    if elem[i, tetmidB[k]] > 0 and midstored[elem[i, tetmidB[k]]]:
                         # Add its adjcent nodes to the index array tracker
                         midedgeind[midnode, 0] = numref[elem[i, typeBmidind[k][0]]]
                         midedgeind[midnode, 1] = numref[elem[i, typeBmidind[k][1]]]
@@ -742,7 +742,7 @@ def ParseForFEM(raw):
             n += 1
         
         # Copy this node and mark as used
-        for j in range(3):
+        for j in range(6):
             nodes[i, j] = oldnodes[n, j]
         nodenum[i] = n
                     

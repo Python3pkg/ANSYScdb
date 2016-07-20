@@ -188,8 +188,6 @@ def Read(filename):
                 isz = int(line[line.find('i') + 1:line.find(')')])
                 break
             
-
-            
     # Initialize element data array.  Use number of lines as nelem is unknown
     cdef int [:, ::1] elem = np.empty((nlines, 20), dtype=np.int32, order='C')
     cdef int [::1] etype = np.empty(nlines, dtype=np.int32, order='C')
@@ -243,7 +241,6 @@ def Read(filename):
     cdef int nblock
         
     # Store node compondents
-#    node_comps = {'FIXED_NODES': [], 'NO_CHECK': []} # always include these
     node_comps = {}
     while True:        
         read = getline(&line, &l, cfile)
