@@ -16,7 +16,6 @@ cdb.ParseVTK()
 cdb.Plot()
 
 """
-import warnings
 
 # Attempt to load VTK dependent modules
 try:
@@ -59,7 +58,6 @@ class Read(object):
         # Python reader for debug purposes
         else:
             self.raw = PythonReader.Read(filename)
-
 
 
     def ParseVTK(self, use_cython=True):
@@ -158,14 +156,17 @@ class Read(object):
         else:
             raise Exception('Unstructred grid not generated.  Run ParseVTK first.')
 
+
     def CheckRaw(self):
         """ Check if raw data can be converted into an unstructured grid """
         try:
             self.raw['elem'][0, 0]
             self.raw['enum'][0]
         except:
-            warnings.warn('Missing EBLOCK!')
             return 1
+
+        return 0
+            
             
 def ExtractThickness(raw):
     """

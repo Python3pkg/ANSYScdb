@@ -25,7 +25,7 @@ def Read(filename):
     cdef size_t l = 0
     cdef ssize_t read
     cdef int[5] blocksz
-    cdef int i, j, nlines
+    cdef int i, j
     cdef int tempint
     cdef int nnodes, linelen, isz
     cdef float tempflt
@@ -170,11 +170,14 @@ def Read(filename):
 
     ############### EBLOCK ###############
     # Seek to the start of the element data
+    cdef int EBLOCK_found
+    cdef int nlines = 0
     while True:
 
-        getline(&line, &l, cfile)
-#        if read == -1:
-#            break
+        read = getline(&line, &l, cfile)
+        if read == -1: # early exit
+            EBLOCK_found = 0
+            break
         
         if 'E' == line[0]:
         
@@ -186,7 +189,11 @@ def Read(filename):
                 # Get interger block size
                 getline(&line, &l, cfile)
                 isz = int(line[line.find('i') + 1:line.find(')')])
+                EBLOCK_found = 1
                 break
+            
+#    if not EBLOCK_found:
+#        nlines = 0
             
     # Initialize element data array.  Use number of lines as nelem is unknown
     cdef int [:, ::1] elem = np.empty((nlines, 20), dtype=np.int32, order='C')
@@ -199,7 +206,7 @@ def Read(filename):
     elem[:] = -1
 
     i = 0 # init counter
-    while True:
+    while EBLOCK_found:
     
         # Check if at end of EBLOCK
         fscanf(cfile, '%d', &tempint)
