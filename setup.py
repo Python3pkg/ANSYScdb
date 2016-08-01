@@ -14,7 +14,7 @@ setup(
     packages = ['ANSYScdb', 'ANSYScdb.Tests'],
 
     # Version
-    version='0.10.3',
+    version='0.10.4',
 
     description='Loads ANSYS cdb files',
     long_description=open('README.rst').read(),
