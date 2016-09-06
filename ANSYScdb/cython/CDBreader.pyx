@@ -1,10 +1,11 @@
 """ Cython implementation of a CDB reader """
-from libc.stdio cimport fopen, FILE, getline, fclose, sscanf, fscanf, fread, fseek, SEEK_CUR
+#from libc.stdio cimport fopen, FILE, getline, fclose, sscanf, fscanf, fread, fseek, SEEK_CUR
+from libc.stdio cimport fopen, FILE, fclose, sscanf, fscanf, fread, fseek, SEEK_CUR
+from libc.stdio cimport fgets
 import numpy as np
 cimport numpy as np
 from libc.stdlib cimport atoi, atof
 from libc.string cimport strncpy, strcmp
-
 
 
 cimport cython
@@ -21,7 +22,7 @@ def Read(filename):
         raise Exception("No such file or directory: '%s'" % filename)
  
     # Define variables
-    cdef char * line = NULL
+#    cdef char * line = NULL
     cdef size_t l = 0
     cdef ssize_t read
     cdef int[5] blocksz
@@ -32,13 +33,16 @@ def Read(filename):
 
     # Size temp char array
     cdef char tempstr[100]
+    cdef char line[1000]
     
     # Get element types
     elem_type = []
     rnum = []
     rdat = []
     while True:
-        getline(&line, &l, cfile)
+#        getline(&line, &l, cfile)
+        fgets(line, 1000, cfile)
+        
         
         # Record element types
         if 'E' == line[0]:
@@ -54,13 +58,17 @@ def Read(filename):
                 nset = int(line[ist:ien])
             
                 # Skip Format1 and Format2 (always 2i8,6g16.9 and 7g16.9)
-                getline(&line, &l, cfile)
-                getline(&line, &l, cfile)
-                
+#                getline(&line, &l, cfile)
+#                getline(&line, &l, cfile)
+                fgets(line, 1000, cfile)
+                fgets(line, 1000, cfile)
+
                 # Read data
                 c_set = 0
                 while True:
-                    getline(&line, &l, cfile)
+#                    getline(&line, &l, cfile)
+                    fgets(line, 1000, cfile)
+                    
                     rcon = [] # real constants
                     
                     c_set += 1
@@ -80,7 +88,8 @@ def Read(filename):
                             ncon -= 1
                             
                         # advance line
-                        getline(&line, &l, cfile)
+#                        getline(&line, &l, cfile)
+                        fgets(line, 1000, cfile)
                          
                         # read next line
                         while True:
@@ -89,8 +98,9 @@ def Read(filename):
                                     rcon.append(float(line[16*i:16*(i + 1)]))
                                     ncon -= 1
                                 # advance
-                                getline(&line, &l, cfile)
-                                    
+#                                getline(&line, &l, cfile)
+                                fgets(line, 1000, cfile)
+                                
                             else:
                                 for i in range(ncon):
                                     rcon.append(float(line[16*i:16 + 16*i]))  
@@ -112,7 +122,8 @@ def Read(filename):
                 nnodes = int(line[line.rfind(',') + 1:])
                 
                 # Get format of NBLOCk
-                getline(&line, &l, cfile)
+#                getline(&line, &l, cfile)
+                fgets(line, 1000, cfile)
                 d_size, f_size, nfld = GetBlockFormat(line)
                 break
 
@@ -174,10 +185,16 @@ def Read(filename):
     cdef int nlines = 0
     while True:
 
-        read = getline(&line, &l, cfile)
-        if read == -1: # early exit
+#        read = getline(&line, &l, cfile)
+#        fgets(line, 1000, cfile)
+#        if read == -1: # early exit
+#            break
+
+        # Deals with empty line
+        if fgets(line, 1000, cfile) is NULL:
             EBLOCK_found = 0
-            break
+            break        
+        
         
         if 'E' == line[0]:
         
@@ -187,7 +204,8 @@ def Read(filename):
                 nlines = int(line[line.rfind(',') + 1:])
                 
                 # Get interger block size
-                getline(&line, &l, cfile)
+#                getline(&line, &l, cfile)
+                fgets(line, 1000, cfile)
                 isz = int(line[line.find('i') + 1:line.find(')')])
                 EBLOCK_found = 1
                 break
@@ -249,10 +267,14 @@ def Read(filename):
         
     # Store node compondents
     node_comps = {}
-    while True:        
-        read = getline(&line, &l, cfile)
-        if read == -1:
+    while True:       
+        # Early exit on end of file (or *god help us* a null character in the file)
+        if fgets(line, 1000, cfile) is NULL:
             break
+        
+#        read = getline(&line, &l, cfile)
+#        if read == -1:
+#            break
     
         if 'C' == line[0]:
             if 'CMBLOCK' and 'NODE' in line:
@@ -267,7 +289,8 @@ def Read(filename):
                 component = np.empty(ncomp, dtype=np.int32, order='C')
                 
                 # Get interger size
-                getline(&line, &l, cfile)
+#                getline(&line, &l, cfile)
+                fgets(line, 1000, cfile)
                 isz = int(line[line.find('i') + 1:line.find(')')])
                 tempstr[isz] = '\0'
                 
@@ -279,7 +302,8 @@ def Read(filename):
                     
                     # Read new line if at the end of the line
                     if i%nblock == 0:
-                        getline(&line, &l, cfile)
+#                        getline(&line, &l, cfile)
+                        fgets(line, 1000, cfile)
                     
                     strncpy(tempstr, line + isz*(i%nblock), isz)
                     component[i] = atoi(tempstr)
