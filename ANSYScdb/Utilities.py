@@ -13,6 +13,14 @@ new_vtk = vtk.vtkVersion().GetVTKMajorVersion() > 5
 def MakeuGrid(offset, cells, cell_type, nodes):
     """ Create VTK unstructured grid """
     
+    # Check inputs (necessary since offset and cells can int32)    
+    if offset.dtype != 'int64':
+        offset = offset.astype(np.int64)
+    
+    if cells.dtype != 'int64':
+        cells = cells.astype(np.int64)
+    
+    # Get number of cells
     ncells = len(cell_type)
     
     # Convert to vtk arrays
