@@ -8,6 +8,8 @@ Cython module to parse raw data from an ANSYS cdb file.
 
 import numpy as np
 cimport numpy as np
+
+import ctypes                   
                    
 # VTK numbering for vtk cells
 cdef int vtkhexnum = 12
@@ -56,16 +58,16 @@ def Parse(raw):
             maxelemtype = ekey[i, 0]
     
     # Create an element type array for indexing
-    cdef int [::1] elem_type = np.empty(maxelemtype + 1, np.int32)
+    cdef int [::1] elem_type = np.empty(maxelemtype + 1, ctypes.c_int)
     for i in range(nekey):
         elem_type[ekey[i, 0]] = ekey[i, 1]
     
     # Allocate memory for cell data
-    cdef long [::1] offset = np.empty(nelem, np.int64)
+    cdef long [::1] offset = np.empty(nelem, ctypes.c_long)
     cdef uint8 [::1] cell_type = np.empty(nelem, dtype='uint8')
     
     # different array sizes depending on midside nodes
-    cdef long [::1] cells = np.empty(nelem*9, np.int64)  # max cell is 8 and header is 1
+    cdef long [::1] cells = np.empty(nelem*9, ctypes.c_long)  # max cell is 8 and header is 1
     
     # Find the highest node number
     cdef int maxnodenum = 0
@@ -75,7 +77,7 @@ def Parse(raw):
     
     # Create reference array for node renumbering
     cdef long n
-    cdef long [::1] numref = np.empty(maxnodenum + 1, np.int64)
+    cdef long [::1] numref = np.empty(maxnodenum + 1, ctypes.c_long)
     for n in range(nnode):
         numref[nnum[n]] = n
     
@@ -441,16 +443,16 @@ def ParseForFEM(raw):
             maxelemtype = ekey[i, 0]
     
     # Create an element type array for indexing
-    cdef int [::1] elem_type = np.empty(maxelemtype + 1, np.int32)
+    cdef int [::1] elem_type = np.empty(maxelemtype + 1, ctypes.c_int)
     for i in range(nekey):
         elem_type[ekey[i, 0]] = ekey[i, 1]
     
     # Allocate memory for cell data
-    cdef long [::1] offset = np.empty(nelem, np.int64)
+    cdef long [::1] offset = np.empty(nelem, ctypes.c_long)
     cdef uint8 [::1] cell_type = np.empty(nelem, dtype='uint8')
     
     # different array sizes depending on midside nodes
-    cdef long [::1] cells = np.empty(nelem*9, np.int64)  # max cell is 8 and header is 1
+    cdef long [::1] cells = np.empty(nelem*9, ctypes.c_long)  # max cell is 8 and header is 1
     
     # Find the highest node number
     cdef int maxnodenum = 0
@@ -499,7 +501,7 @@ def ParseForFEM(raw):
             c += 1
 
     # Track original node numbering        
-    cdef long [::1] orignum = np.empty(nnode, np.int64)
+    cdef long [::1] orignum = np.empty(nnode, ctypes.c_long)
     c = 0
     for i in range(maxnodenum + 1):
         if nodeused[i]:
@@ -508,7 +510,7 @@ def ParseForFEM(raw):
         
     # Node reference array relating original node numbering to new node
     # numbering
-    cdef long [::1] numref = np.empty(maxnodenum + 1, np.int64)
+    cdef long [::1] numref = np.empty(maxnodenum + 1, ctypes.c_long)
     c = 0 # reset counter (this becomes the number of valid nodes)
     for i in range(maxnodenum + 1):
         if nodeused[i]:
@@ -518,24 +520,23 @@ def ParseForFEM(raw):
             numref[i] = -1
 
     # Create edges and square cell type array
-    cdef long [:, ::1] edges = np.empty((nelem*12, 2), np.int64)
-#    cdef int [:, ::1] cellarr = np.empty((nelem, 8), np.int32)
-    cdef int [:, ::1] cellarr = np.zeros((nelem, 8), np.int32)
-    cdef int [::1] ncellpts = np.empty(nelem, np.int32)
+    cdef long [:, ::1] edges = np.empty((nelem*12, 2), ctypes.c_long)
+    cdef int [:, ::1] cellarr = np.zeros((nelem, 8), ctypes.c_int)
+    cdef int [::1] ncellpts = np.empty(nelem, ctypes.c_int)
     
     # Track if elements are used
     cdef uint8 [::1] elemused = np.zeros(nelem, dtype='uint8')
     
     # Also, track the indices of the midside nodes based on their adjcent edge
     # nodes in the new indexing
-    cdef long [:, ::1] midedgeind = np.empty((nnode, 2), np.int64) # sized for maximum number of nodes, will trim later
+    cdef long [:, ::1] midedgeind = np.empty((nnode, 2), ctypes.c_long) # sized for maximum number of nodes, will trim later
     
     # Also track the original midside node indices
-    cdef long [::1] midind = np.empty(nnode, np.int64) # sized for maximum number of nodes, will trim later
+    cdef long [::1] midind = np.empty(nnode, ctypes.c_long) # sized for maximum number of nodes, will trim later
     cdef int midnode = 0
     
     # Array to track if a midside node has been stored
-    cdef int [::1] midstored = np.zeros(maxnodenum + 1, np.int32)
+    cdef int [::1] midstored = np.zeros(maxnodenum + 1, ctypes.c_int)
     
     # Loop through each element and check if the element type matches one this code
     # can read
@@ -752,7 +753,7 @@ def ParseForFEM(raw):
     # Regenerate node list
     cdef double [:, ::1] oldnodes = raw['nodes'] # c is the number of valid edge nodes
     cdef double [:, ::1] nodes = np.empty((c, 6 )) # c is the number of valid edge nodes
-    cdef long [::1] nodenum = np.zeros(c, dtype=np.int64) # track if nodes are used
+    cdef long [::1] nodenum = np.zeros(c, dtype=ctypes.c_long) # track if nodes are used
 
     cdef int n = 0 # index for old node numbering system
     for i in range(c):
@@ -777,7 +778,7 @@ def ParseForFEM(raw):
     
     # No idea why the following won't do the same thing as above!
 #    cdef int [::1] nodecomp
-#    cdef long [::1] temparr = np.empty(nnode, np.int64)
+#    cdef long [::1] temparr = np.empty(nnode, ctypes.c_long)
 #    for comp in raw['node_comps']:
 #        
 #        # Convert from numpy array to memory view array
