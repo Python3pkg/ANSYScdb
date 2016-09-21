@@ -1,5 +1,4 @@
 """ Cython implementation of a CDB reader """
-#from libc.stdio cimport fopen, FILE, getline, fclose, sscanf, fscanf, fread, fseek, SEEK_CUR
 from libc.stdio cimport fopen, FILE, fclose, sscanf, fscanf, fread, fseek, SEEK_CUR
 from libc.stdio cimport fgets
 import numpy as np
@@ -17,12 +16,12 @@ def Read(filename):
     
     # Check file exists
     cdef FILE* cfile
-    cfile = fopen(fname, "rb")
+#    cfile = fopen(fname, "rb")
+    cfile = fopen(fname, 'r')
     if cfile == NULL:
         raise Exception("No such file or directory: '%s'" % filename)
  
     # Define variables
-#    cdef char * line = NULL
     cdef size_t l = 0
     cdef ssize_t read
     cdef int[5] blocksz
@@ -40,7 +39,6 @@ def Read(filename):
     rnum = []
     rdat = []
     while True:
-#        getline(&line, &l, cfile)
         fgets(line, 1000, cfile)
         
         
@@ -58,8 +56,6 @@ def Read(filename):
                 nset = int(line[ist:ien])
             
                 # Skip Format1 and Format2 (always 2i8,6g16.9 and 7g16.9)
-#                getline(&line, &l, cfile)
-#                getline(&line, &l, cfile)
                 fgets(line, 1000, cfile)
                 fgets(line, 1000, cfile)
 
@@ -88,7 +84,6 @@ def Read(filename):
                             ncon -= 1
                             
                         # advance line
-#                        getline(&line, &l, cfile)
                         fgets(line, 1000, cfile)
                          
                         # read next line
@@ -98,7 +93,6 @@ def Read(filename):
                                     rcon.append(float(line[16*i:16*(i + 1)]))
                                     ncon -= 1
                                 # advance
-#                                getline(&line, &l, cfile)
                                 fgets(line, 1000, cfile)
                                 
                             else:
@@ -122,7 +116,6 @@ def Read(filename):
                 nnodes = int(line[line.rfind(',') + 1:])
                 
                 # Get format of NBLOCk
-#                getline(&line, &l, cfile)
                 fgets(line, 1000, cfile)
                 d_size, f_size, nfld = GetBlockFormat(line)
                 break
@@ -185,12 +178,7 @@ def Read(filename):
     cdef int nlines = 0
     while True:
 
-#        read = getline(&line, &l, cfile)
-#        fgets(line, 1000, cfile)
-#        if read == -1: # early exit
-#            break
-
-        # Deals with empty line
+        # Deal with empty line
         if fgets(line, 1000, cfile) is NULL:
             EBLOCK_found = 0
             break        
@@ -204,14 +192,11 @@ def Read(filename):
                 nlines = int(line[line.rfind(',') + 1:])
                 
                 # Get interger block size
-#                getline(&line, &l, cfile)
                 fgets(line, 1000, cfile)
                 isz = int(line[line.find('i') + 1:line.find(')')])
                 EBLOCK_found = 1
                 break
             
-#    if not EBLOCK_found:
-#        nlines = 0
             
     # Initialize element data array.  Use number of lines as nelem is unknown
     cdef int [:, ::1] elem = np.empty((nlines, 20), dtype=np.int32, order='C')
@@ -272,10 +257,6 @@ def Read(filename):
         if fgets(line, 1000, cfile) is NULL:
             break
         
-#        read = getline(&line, &l, cfile)
-#        if read == -1:
-#            break
-    
         if 'C' == line[0]:
             if 'CMBLOCK' and 'NODE' in line:
 
@@ -289,7 +270,6 @@ def Read(filename):
                 component = np.empty(ncomp, dtype=np.int32, order='C')
                 
                 # Get interger size
-#                getline(&line, &l, cfile)
                 fgets(line, 1000, cfile)
                 isz = int(line[line.find('i') + 1:line.find(')')])
                 tempstr[isz] = '\0'
@@ -302,7 +282,6 @@ def Read(filename):
                     
                     # Read new line if at the end of the line
                     if i%nblock == 0:
-#                        getline(&line, &l, cfile)
                         fgets(line, 1000, cfile)
                     
                     strncpy(tempstr, line + isz*(i%nblock), isz)
