@@ -15,7 +15,6 @@ typeB = np.empty(2, np.int64)
 typeB[0] = 92
 typeB[1] = 187
                    
-# Cython doesn't appear to have a readily accesable type defintion for an unsigned 8-bit
                    
 def Parse(raw):
     """ Pythonic implementation of CDB parser """

@@ -16,23 +16,29 @@ cdb.ParseVTK()
 cdb.Plot()
 
 """
+import warnings
+import numpy as np
 
 # Attempt to load VTK dependent modules
 try:
-    import Utilities
-    import Plotting
-    vtk_failed = False
-
+    from ANSYScdb import Utilities
+    from ANSYScdb import Plotting
+    vtk_loaded = True
 except:
-    vtk_failed = True
-
-import numpy as np
+    warnings.warn('Unable to load vtk dependent modules')
+    vtk_loaded = False
 
 # Cython modules
-import CDBparser
-import CDBreader
-import PythonReader
-import PythonParser
+try:
+    from ANSYScdb import CDBparser
+    from ANSYScdb import CDBreader
+    cython_loaded = True
+except:
+    warnings.warn('Unable to load Cython modules')
+    cython_loaded = False
+    
+from ANSYScdb import PythonReader
+from ANSYScdb import PythonParser
 
 
 class Read(object):
@@ -52,7 +58,7 @@ class Read(object):
         """
         
         # Defaults to cython reader if user selects it
-        if use_cython:
+        if use_cython and cython_loaded:
             self.raw = CDBreader.Read(filename)
 
         # Python reader for debug purposes
@@ -65,15 +71,19 @@ class Read(object):
         Parses raw data from cdb file to VTK format
         
         """
-        if vtk_failed:
+        if not vtk_loaded:
             raise Exception('Unable to load VTK module.  Cannot parse raw cdb data!')
             return
+            
            
         if self.CheckRaw():
             raise Exception('Missing key data.  Cannot parse into unstructured grid.')            
            
         # Convert to vtk style arrays
-        cells, offset, cell_type, numref = CDBparser.Parse(self.raw)
+        if use_cython and cython_loaded:
+            cells, offset, cell_type, numref = CDBparser.Parse(self.raw)
+        else:
+            cells, offset, cell_type, numref = PythonParser.Parse(self.raw)
 
         # Create unstructured grid
         self.uGrid = Utilities.MakeuGrid(offset, cells, cell_type,
@@ -98,7 +108,7 @@ class Read(object):
         
     def ParseFEM(self, use_cython=True):
         """ Parses raw data from cdb file to VTK format """
-        if vtk_failed:
+        if not vtk_loaded:
             raise Exception('Unable to load VTK module.  Cannot parse raw cdb data!')
             return
             
@@ -106,12 +116,11 @@ class Read(object):
             raise Exception('Missing key data.  Cannot parse into unstructured grid.')            
             
         # Convert to vtk style arrays
-        if use_cython:
+        if use_cython and cython_loaded:
             self.data = CDBparser.ParseForFEM(self.raw)
         else:
             self.data = PythonParser.ParseForFEM(self.raw)
             
-
         # Create unstructured grid
         self.uGrid = Utilities.MakeuGrid(self.data['offset'], self.data['cells'], 
                                          self.data['cell_type'],
@@ -148,7 +157,7 @@ class Read(object):
         
     def Plot(self):
         """ Plot unstructured grid """
-        if vtk_failed:
+        if not vtk_loaded:
             raise Exception('VTK not loaded!')
         
         if hasattr(self, 'uGrid'):

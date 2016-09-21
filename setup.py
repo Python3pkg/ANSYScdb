@@ -1,8 +1,7 @@
-# -*- coding: utf-8 -*-
 """
 Setup.py for ANSYScdb
-
 """
+
 from setuptools import setup, Extension
 from Cython.Distutils import build_ext
 
@@ -14,7 +13,7 @@ setup(
     packages = ['ANSYScdb', 'ANSYScdb.Tests'],
 
     # Version
-    version='0.11.3',
+    version='0.12',
 
     description='Loads ANSYS cdb files',
     long_description=open('README.rst').read(),
@@ -34,8 +33,9 @@ setup(
         # MIT License
         'License :: OSI Approved :: MIT License',
 
-        # Tested only on Python 2.7 (untested with 3)
+        # Tested with on Python 2.7 and 3.5
         'Programming Language :: Python :: 2.7',
+        'Programming Language :: Python :: 3.5',
     ],
 
     # Website
