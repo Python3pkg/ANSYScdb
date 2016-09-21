@@ -6,7 +6,6 @@ cimport numpy as np
 from libc.stdlib cimport atoi, atof
 from libc.string cimport strncpy, strcmp
 
-
 cimport cython
 @cython.boundscheck(False) # turn of bounds-checking for entire function
 @cython.wraparound(False)
@@ -18,6 +17,7 @@ def Read(filename):
     cdef FILE* cfile
 #    cfile = fopen(fname, "rb")
     cfile = fopen(fname, 'r')
+    print('file opened')
     if cfile == NULL:
         raise Exception("No such file or directory: '%s'" % filename)
  
@@ -41,18 +41,17 @@ def Read(filename):
     while True:
         fgets(line, 1000, cfile)
         
-        
         # Record element types
         if 'E' == line[0]:
-            if 'ET' in line:
-                elem_type.append([int(line[3:line.find(',', 5)]),     # element number
-                                  int(line[line.find(',', 5) + 1:])]) # element type        
-        
+            if b'ET' in line:
+                elem_type.append([int(line[3:line.find(b',', 5)]),     # element number
+                                  int(line[line.find(b',', 5) + 1:])]) # element type        
+                
         if 'R' == line[0]:
-            if 'RLBLOCK' in line:
+            if b'RLBLOCK' in line:
                 # Get number of sets
-                ist = line.find(',') + 1
-                ien = line[ist:].find(',') + ist
+                ist = line.find(b',') + 1
+                ien = line[ist:].find(b',') + ist
                 nset = int(line[ist:ien])
             
                 # Skip Format1 and Format2 (always 2i8,6g16.9 and 7g16.9)
@@ -109,12 +108,11 @@ def Read(filename):
                     rdat.append(rcon)
         
         if 'N' == line[0]: # Test is faster than next line
-        
             # if line contains the start of the node block
-            if 'NBLOCK' in line:
+            if b'NBLOCK' in line:
                 # Get size of NBLOCK
-                nnodes = int(line[line.rfind(',') + 1:])
-                
+                nnodes = int(line[line.rfind(b',') + 1:])
+
                 # Get format of NBLOCk
                 fgets(line, 1000, cfile)
                 d_size, f_size, nfld = GetBlockFormat(line)
@@ -187,22 +185,22 @@ def Read(filename):
         if 'E' == line[0]:
         
             # if line contains the start of the node block
-            if 'EBLOCK' in line:
+            if b'EBLOCK' in line:
                 # Get size of EBLOCK
-                nlines = int(line[line.rfind(',') + 1:])
+                nlines = int(line[line.rfind(b',') + 1:])
                 
                 # Get interger block size
                 fgets(line, 1000, cfile)
-                isz = int(line[line.find('i') + 1:line.find(')')])
+                isz = int(line[line.find(b'i') + 1:line.find(b')')])
                 EBLOCK_found = 1
                 break
             
             
     # Initialize element data array.  Use number of lines as nelem is unknown
-    cdef int [:, ::1] elem = np.empty((nlines, 20), dtype=np.int32, order='C')
-    cdef int [::1] etype = np.empty(nlines, dtype=np.int32, order='C')
-    cdef int [::1] elemnum = np.empty(nlines, dtype=np.int32, order='C')
-    cdef int [::1] e_rcon = np.empty(nlines, dtype=np.int32, order='C')
+    cdef int [:, ::1] elem = np.empty((nlines, 20), dtype=np.int32)
+    cdef int [::1] etype = np.empty(nlines, dtype=np.int32)
+    cdef int [::1] elemnum = np.empty(nlines, dtype=np.int32)
+    cdef int [::1] e_rcon = np.empty(nlines, dtype=np.int32)
     cdef int nnode, nelem
 
     # Null element is -1
@@ -258,24 +256,24 @@ def Read(filename):
             break
         
         if 'C' == line[0]:
-            if 'CMBLOCK' and 'NODE' in line:
+            if b'CMBLOCK' and b'NODE' in line:
 
                 # Get Component name
-                ind1 = line.find(',') + 1
-                ind2 = line.find(',', ind1)
+                ind1 = line.find(b',') + 1
+                ind2 = line.find(b',', ind1)
                 comname = line[ind1:ind2]
 
                 # Get number of items
-                ncomp = int(line[line.rfind(',') + 1:line.find('!')])
-                component = np.empty(ncomp, dtype=np.int32, order='C')
+                ncomp = int(line[line.rfind(b',') + 1:line.find(b'!')])
+                component = np.empty(ncomp, np.int32)
                 
                 # Get interger size
                 fgets(line, 1000, cfile)
-                isz = int(line[line.find('i') + 1:line.find(')')])
+                isz = int(line[line.find(b'i') + 1:line.find(b')')])
                 tempstr[isz] = '\0'
                 
                 # Number of intergers per line
-                nblock = int(line[line.find('(') + 1:line.find('i')])
+                nblock = int(line[line.find(b'(') + 1:line.find(b'i')])
                 
                 # Extract nodes
                 for i in xrange(ncomp):
@@ -309,9 +307,9 @@ def GetBlockFormat(string):
     """ Get node block format """
     
     # Digit Size
-    d_size = int(string[string.find('i') + 1:string.find(',')])
-    f_size = int(string[string.find('e') + 1:string.find('.')])
-    nfields = int(string[string.find(',') + 1:string.find('e')])
+    d_size = int(string[string.find(b'i') + 1:string.find(b',')])
+    f_size = int(string[string.find(b'e') + 1:string.find(b'.')])
+    nfields = int(string[string.find(b',') + 1:string.find(b'e')])
 
     return d_size, f_size, nfields
 
