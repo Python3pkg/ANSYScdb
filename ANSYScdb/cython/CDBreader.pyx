@@ -17,9 +17,7 @@ def Read(filename):
     # Check file exists
     cdef FILE* cfile
 #    cfile = fopen(fname, "rb")
-    print('made it here')
     cfile = fopen(fname, 'r')
-    print('file opened')
     if cfile == NULL:
         raise Exception("No such file or directory: '%s'" % filename)
  
@@ -42,7 +40,6 @@ def Read(filename):
     rdat = []
     while True:
         fgets(line, 1000, cfile)
-        print('I just read a line')
         
         
         # Record element types
