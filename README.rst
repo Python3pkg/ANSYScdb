@@ -54,10 +54,10 @@ Assumes you have downloaded the example CDB files. Otherwise, replace
 .. code:: python
 
     #Load module
-    from ANSYScdb import CDB
+    from ANSYScdb import CDB_Reader
 
     #Load ANSYS cdb file
-    cdb = CDB.Reader('HexBeam.cdb')
+    cdb = CDB_Reader.Read('HexBeam.cdb')
 
     # Parse the raw data into a VTK unstructured grid
     cdb.ParseVTK() # Should the cython reader fail, use: cdb.ParseVTK(use_cython=False)

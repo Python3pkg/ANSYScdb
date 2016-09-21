@@ -15,9 +15,8 @@ def Read(filename):
     
     # Check file exists
     cdef FILE* cfile
-#    cfile = fopen(fname, "rb")
     cfile = fopen(fname, 'r')
-    print('file opened')
+
     if cfile == NULL:
         raise Exception("No such file or directory: '%s'" % filename)
  
