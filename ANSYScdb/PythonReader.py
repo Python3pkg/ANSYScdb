@@ -270,7 +270,10 @@ def RLBLOCK_Reader(fileObj, fpos, line):
                         
                 else:
                     for i in range(ncon):
-                        rcon.append(float(line[16*i:16 + 16*i]))  
+                        try:
+                            rcon.append(float(line[16*i:16 + 16*i]))  
+                        except:
+                            rcon.append(0.0)
                         
                     break
                 
