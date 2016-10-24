@@ -30,8 +30,8 @@ except:
 
 # Cython modules
 try:
+    from ANSYScdb import _reader
     from ANSYScdb import CDBparser
-    from ANSYScdb import CDBreader
     cython_loaded = True
 except:
     warnings.warn('Unable to load Cython modules')
@@ -44,7 +44,7 @@ from ANSYScdb import PythonParser
 class Read(object):
     """ FEM object """
     
-    def __init__(self, filename, use_cython=True):
+    def __init__(self, filename='', use_cython=True, raw=None):
         """
         Initialize cdb object by reading raw cdb from file
         
@@ -54,12 +54,20 @@ class Read(object):
             
         use_cython (bool optional):
             boolean flag to use cython reader defaults to True
+
+        raw (dictonary optional):
+            dictionary of raw data
     
         """
         
+        if raw and not filename:
+            # Load raw data exterinally
+            self.raw = raw
+            return
+        
         # Defaults to cython reader if user selects it
         if use_cython and cython_loaded:
-            self.raw = CDBreader.Read(filename)
+            self.raw = _reader.Read(filename)
 
         # Python reader for debug purposes
         else:
@@ -106,7 +114,7 @@ class Read(object):
         return self.uGrid
         
         
-    def ParseFEM(self, use_cython=True):
+    def ParseFEM(self, use_cython=True, raw=None):
         """ Parses raw data from cdb file to VTK format """
         if not vtk_loaded:
             raise Exception('Unable to load VTK module.  Cannot parse raw cdb data!')

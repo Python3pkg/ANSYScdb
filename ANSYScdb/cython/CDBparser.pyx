@@ -9,6 +9,10 @@ Cython module to parse raw data from an ANSYS cdb file.
 import numpy as np
 cimport numpy as np
 
+# Numpy must be initialized. When using numpy from C or Cython you must
+# _always_ do that, or you will have segfaults
+np.import_array()
+
 import ctypes                   
                    
 # VTK numbering for vtk cells

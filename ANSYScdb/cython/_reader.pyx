@@ -1,15 +1,61 @@
+# cython: boundscheck=False
+# cython: wraparound=False
+# cython: cdivision=True
+
 """ Cython implementation of a CDB reader """
-from libc.stdio cimport fopen, FILE, fclose, sscanf, fscanf, fread, fseek, SEEK_CUR
-from libc.stdio cimport fgets
-import numpy as np
-cimport numpy as np
+from libc.stdio cimport fopen, FILE, fclose, sscanf, fscanf, fread, fseek
+from libc.stdio cimport fgets, printf, SEEK_CUR, SEEK_END, ftell, SEEK_SET
 from libc.stdlib cimport atoi, atof
+from libc.stdlib cimport malloc, free
 from libc.string cimport strncpy, strcmp
 
-cimport cython
-@cython.boundscheck(False) # turn of bounds-checking for entire function
-@cython.wraparound(False)
+import numpy as np
+cimport numpy as np
+
+import ctypes
+
+# Numpy must be initialized. When using numpy from C or Cython you must
+# _always_ do that, or you will have segfaults
+np.import_array()
+
+cdef extern from "reader.h":
+    int read_nblock(char*, int*, double*, int, int, int, int*, int)
+    int read_eblock(char*, int*, int*, int*, int*, int, int, int*, int);
+
+    
+cdef int myfgets(char *outstr, char *instr, int *n, int fsize):
+    """ Copies a single line from instr to outstr starting from position n """
+    
+    cdef int k = n[0]
+    
+    # Search line at a maximum of 1000 characters
+    cdef int i, c
+    c = n[0]
+    for i in range(1000):
+        # check if end of file
+        if c > fsize:
+            return 1
+            
+        # Add null character if at end of line
+        if instr[c] == '\r':
+            n[0] += i + 2
+            outstr[i] = '\0'
+            return 0
+        elif instr[c] == '\n':
+            n[0] += i + 1
+            outstr[i] = '\0'
+            return 0
+            
+        # Otherwise, store data to output string
+        outstr[i] = instr[c]
+        c += 1
+        
+    # Line exceeds 1000 char (unlikely with ANSYS CDB formatting)
+    return 1
+                
+
 def Read(filename):
+    badstr = 'Badly formatted cdb file'
     filename_byte_string = filename.encode("UTF-8")
     cdef char* fname = filename_byte_string
     
@@ -19,7 +65,32 @@ def Read(filename):
 
     if cfile == NULL:
         raise Exception("No such file or directory: '%s'" % filename)
- 
+
+    # Load entire file to memory
+    fseek(cfile, 0, SEEK_END)
+    cdef int fsize = ftell(cfile)
+    fseek(cfile, 0, SEEK_SET)
+    cdef char *raw = < char * >malloc(fsize*sizeof(char))
+    fread(raw, 1, fsize, cfile)
+    fclose(cfile)
+    
+    # File counter
+    cdef int EOL
+    cdef int n = 0
+    
+    # Detect end of line character
+    while n < fsize:
+        if raw[n] == '\r':
+            EOL = 2
+            break
+        elif raw[n] == '\n':
+            EOL = 1
+            break
+        n += 1
+        
+    # Reset line position
+    n = 0
+    
     # Define variables
     cdef size_t l = 0
     cdef ssize_t read
@@ -30,16 +101,20 @@ def Read(filename):
     cdef float tempflt
 
     # Size temp char array
-    cdef char tempstr[100]
     cdef char line[1000]
+    cdef char tempstr[100]
     
     # Get element types
     elem_type = []
     rnum = []
     rdat = []
-    while True:
-        fgets(line, 1000, cfile)
-        
+
+    # Read data up to and including start of NBLOCK
+    while 1:
+        if myfgets(line, raw, &n, fsize):
+            raise Exception('No NBLOCK in file.  Check if file is a blocked '+\
+                            'ANSYS archive file.')
+                            
         # Record element types
         if 'E' == line[0]:
             if b'ET' in line:
@@ -54,14 +129,13 @@ def Read(filename):
                 nset = int(line[ist:ien])
             
                 # Skip Format1 and Format2 (always 2i8,6g16.9 and 7g16.9)
-                fgets(line, 1000, cfile)
-                fgets(line, 1000, cfile)
+                if myfgets(line, raw, &n, fsize): raise Exception(badstr)
+                if myfgets(line, raw, &n, fsize): raise Exception(badstr)
 
                 # Read data
                 c_set = 0
                 while True:
-#                    getline(&line, &l, cfile)
-                    fgets(line, 1000, cfile)
+                    if myfgets(line, raw, &n, fsize): raise Exception(badstr)
                     
                     rcon = [] # real constants
                     
@@ -82,7 +156,7 @@ def Read(filename):
                             ncon -= 1
                             
                         # advance line
-                        fgets(line, 1000, cfile)
+                        if myfgets(line, raw, &n, fsize): raise Exception(badstr)
                          
                         # read next line
                         while True:
@@ -91,7 +165,7 @@ def Read(filename):
                                     rcon.append(float(line[16*i:16*(i + 1)]))
                                     ncon -= 1
                                 # advance
-                                fgets(line, 1000, cfile)
+                                if myfgets(line, raw, &n, fsize): raise Exception(badstr)
                                 
                             else:
                                 for i in range(ncon):
@@ -113,135 +187,58 @@ def Read(filename):
                 nnodes = int(line[line.rfind(b',') + 1:])
 
                 # Get format of NBLOCk
-                fgets(line, 1000, cfile)
+                if myfgets(line, raw, &n, fsize): raise Exception(badstr)
                 d_size, f_size, nfld = GetBlockFormat(line)
                 break
-
             
-    # Size node arrays
-    cdef int [::1] nnum = np.empty(nnodes, dtype=np.int32)
+            
+    
+    
+    #==========================================================================
+    # Read nblock
+    #==========================================================================
+    cdef int [::1] nnum = np.empty(nnodes, dtype=ctypes.c_int)
     cdef double [:, ::1] nodes = np.empty((nnodes, 6))
-    nodes[:] = 0.0
-    
-    # Create the interger string and place the null character
-    cdef int intsize = d_size
-    cdef char intstr[100]
-    intstr[intsize + 1] = '\0'
-    
-    # Create floating point number string and place the null character
-    cdef int fsize = f_size
-    cdef char floatstr[100]
-    floatstr[fsize + 1] = '\0'
 
-    # Loop through all nodes and store number of fields
-    cdef int nfields = nfld
-    for i in range(nnodes):
-        # Read node number from field 1
-        fread(intstr, 1, intsize, cfile)
-        nnum[i] = atoi(intstr)
-        
-        # skip fields 2 and 3
-        fseek(cfile, intsize*2, SEEK_CUR)
-        
-        # Read fields 4-9 (or 4-6)
-        for j in range(nfields):
-            fread(floatstr, 1, fsize, cfile)
-            if '\r' == floatstr[0]: # if dos EOL
-                # Seek backwards as we've gone past the EOL
-                fseek(cfile, -(fsize - 2), SEEK_CUR)
-                break
-            
-            elif '\n' == floatstr[0]:
-                # Seek backwards as we've gone past the EOL
-                fseek(cfile, -(fsize - 1), SEEK_CUR)
-                break
-            
-            else:
-                # Otherwise, convert and store
-                nodes[i, j] = atof(floatstr)
-            
-    
-        # If all fields have been read
-        if j == nfields - 1:
-            fread(tempstr, 1, 1, cfile)
-            if '\r' == tempstr[0]: # if dos EOL
-                # read the next eol character and continue
-                fseek(cfile, 1, SEEK_CUR)
-
-
+    n = read_nblock(raw, &nnum[0], &nodes[0, 0], nnodes, d_size, f_size, &n,
+                    EOL)
+                    
     ############### EBLOCK ###############
     # Seek to the start of the element data
     cdef int EBLOCK_found
-    cdef int nlines = 0
+    cdef int nelem = 0
     while True:
 
         # Deal with empty line
-        if fgets(line, 1000, cfile) is NULL:
+        if myfgets(line, raw, &n, fsize):
             EBLOCK_found = 0
-            break        
-        
+            break       
         
         if 'E' == line[0]:
         
             # if line contains the start of the node block
             if b'EBLOCK' in line:
                 # Get size of EBLOCK
-                nlines = int(line[line.rfind(b',') + 1:])
+                nelem = int(line[line.rfind(b',') + 1:])
                 
                 # Get interger block size
-                fgets(line, 1000, cfile)
+                myfgets(line, raw, &n, fsize)
                 isz = int(line[line.find(b'i') + 1:line.find(b')')])
                 EBLOCK_found = 1
                 break
             
             
     # Initialize element data array.  Use number of lines as nelem is unknown
-    cdef int [:, ::1] elem = np.empty((nlines, 20), dtype=np.int32)
-    cdef int [::1] etype = np.empty(nlines, dtype=np.int32)
-    cdef int [::1] elemnum = np.empty(nlines, dtype=np.int32)
-    cdef int [::1] e_rcon = np.empty(nlines, dtype=np.int32)
-    cdef int nnode, nelem
+    cdef int [:, ::1] elem = np.empty((nelem, 20), dtype=np.int32)
+    cdef int [::1] etype = np.empty(nelem, dtype=np.int32)
+    cdef int [::1] elemnum = np.empty(nelem, dtype=np.int32)
+    cdef int [::1] e_rcon = np.empty(nelem, dtype=np.int32)
 
-    # Null element is -1
-    elem[:] = -1
-
-    i = 0 # init counter
-    while EBLOCK_found:
-    
-        # Check if at end of EBLOCK
-        fscanf(cfile, '%d', &tempint)
-        if tempint == -1:
-            break
+    # Call C extention to read eblock
+    if EBLOCK_found:
+        nelem = read_eblock(raw, &etype[0], &e_rcon[0], &elemnum[0], &elem[0, 0], 
+                        nelem, isz, &n, EOL)
         
-        # Field 2: Read element type
-        fscanf(cfile, '%d', &tempint)
-        etype[i] = tempint
-    
-        # Field 3: Read real constant
-        fscanf(cfile, '%d', &tempint)
-        e_rcon[i] = tempint
-
-        # Skip Fields 4 - 8 and store 9, the number of nodes    
-        for c in range(6):
-            fscanf(cfile, '%d', &nnode)
-
-        # Store element number
-        for c in range(2):
-            fscanf(cfile, '%d', &tempint)
-        elemnum[i] = tempint        
-            
-        # Read nodes in element
-        for c in range(nnode):
-            fscanf(cfile, '%d', &tempint)
-            elem[i, c] = tempint
-            
-        # next element
-        i += 1
-        
-    # Store actual number of elements
-    nelem = i
-
-
     # Get node components
     cdef int ncomp
     cdef int [::1] component
@@ -251,11 +248,11 @@ def Read(filename):
     node_comps = {}
     while True:       
         # Early exit on end of file (or *god help us* a null character in the file)
-        if fgets(line, 1000, cfile) is NULL:
+        if myfgets(line, raw, &n, fsize):
             break
         
         if 'C' == line[0]:
-            if b'CMBLOCK' and b'NODE' in line:
+            if b'CMBLOCK' in line and b'NODE' in line:
 
                 # Get Component name
                 ind1 = line.find(b',') + 1
@@ -267,7 +264,7 @@ def Read(filename):
                 component = np.empty(ncomp, np.int32)
                 
                 # Get interger size
-                fgets(line, 1000, cfile)
+                myfgets(line, raw, &n, fsize)
                 isz = int(line[line.find(b'i') + 1:line.find(b')')])
                 tempstr[isz] = '\0'
                 
@@ -279,7 +276,7 @@ def Read(filename):
                     
                     # Read new line if at the end of the line
                     if i%nblock == 0:
-                        fgets(line, 1000, cfile)
+                        myfgets(line, raw, &n, fsize)
                     
                     strncpy(tempstr, line + isz*(i%nblock), isz)
                     component[i] = atoi(tempstr)
@@ -287,8 +284,8 @@ def Read(filename):
                 # Convert component to array and store
                 node_comps[comname] = ComponentInterperter(component)
                       
-    # Close file
-    fclose(cfile)
+    # Free memory
+    free(raw)
 
     return {'rnum': np.asarray(rnum),
             'rdat': np.asarray(rdat),

@@ -9,6 +9,28 @@ import numpy as np
 # Determine if using vtk > 5
 new_vtk = vtk.vtkVersion().GetVTKMajorVersion() > 5
 
+def ExtractExteriorTri(uGrid):
+    """
+    Return surface mesh from an unstructured grid
+    
+    INPUTS
+    uGrid (vtkUnstructuredGrid)
+        
+    OUTPUTS
+    surf (vtkPolyData)
+        vtkPolyData surface containing array 'vtkOriginalPointIds' relating the
+        points of extsurf and uGrid
+    
+    """    
+
+    # Extract surface mesh
+    surf = vtk.vtkDataSetSurfaceFilter()
+    SetVTKInput(surf, uGrid)        
+    surf.PassThroughPointIdsOn()
+    surf.PassThroughCellIdsOn()
+    surf.Update()
+    return surf.GetOutput()
+    
 
 def MakeuGrid(offset, cells, cell_type, nodes):
     """ Create VTK unstructured grid """

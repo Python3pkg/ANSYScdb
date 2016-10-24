@@ -1,11 +1,44 @@
 """
 Setup.py for ANSYScdb
 """
-
+#import os
 from setuptools import setup, Extension
 from Cython.Distutils import build_ext
 
 import numpy
+import sys
+
+# Check compiler and assign compile arguments accordingly
+def compilerName():
+  import re
+  import distutils.ccompiler
+  comp = distutils.ccompiler.get_default_compiler()
+  getnext = False
+
+  for a in sys.argv[2:]:
+    if getnext:
+      comp = a
+      getnext = False
+      continue
+    #separated by space
+    if a == '--compiler'  or  re.search('^-[a-z]*c$', a):
+      getnext = True
+      continue
+    #without space
+    m = re.search('^--compiler=(.+)', a)
+    if m == None:
+      m = re.search('^-[a-z]*c(.+)', a)
+    if m:
+      comp = m.group(1)
+
+  return comp
+
+# Assign arguments based on compiler
+compiler = compilerName()
+if compiler == 'unix' or compiler == 'msvc':
+    cmp_arg = ['-O3']
+else:
+    cmp_arg = ['/Ox']
 
 
 setup(
@@ -13,7 +46,7 @@ setup(
     packages = ['ANSYScdb', 'ANSYScdb.Tests'],
 
     # Version
-    version='0.12.1',
+    version='0.13',
 
     description='Loads ANSYS cdb files',
     long_description=open('README.rst').read(),
@@ -47,9 +80,12 @@ setup(
                            ["ANSYScdb/cython/CDBparser.pyx"],
                            language='c'),
 
-                 Extension("ANSYScdb.CDBreader", 
-                           ["ANSYScdb/cython/CDBreader.pyx"],
-                           language='c'),
+                 Extension('ANSYScdb._reader', 
+                           ['ANSYScdb/cython/_reader.pyx',
+                            'ANSYScdb/cython/reader.c'],
+                           extra_compile_args=cmp_arg,
+                           language='c',),
+
                 ],
                            
     keywords='vtk ANSYS cdb',                           
