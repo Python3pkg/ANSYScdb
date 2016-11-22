@@ -2,10 +2,11 @@ import vtk
 import numpy as np
 import colorsys
 
-import Utilities
-from Utilities import new_vtk
+from ANSYScdb import Utilities
 from vtk.util import numpy_support as VN
 
+# Check using new vtk version
+new_vtk = Utilities.new_vtk
     
 class PlotClass(object):
     """ Simple interface to VTK's underlying ploting """
