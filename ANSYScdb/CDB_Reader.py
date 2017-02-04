@@ -74,34 +74,47 @@ class Read(object):
             self.raw = PythonReader.Read(filename)
 
 
-    def ParseVTK(self, use_cython=True):
+    def ParseVTK(self, use_cython=True, force_linear=False):
         """
-        Parses raw data from cdb file to VTK format
+        DESCRPTION
+        Parses raw data from cdb file to VTK format.  Creates unstructured grid
+        as self.uGrid
+        
+        INPUTS
+        use_cython (bool, default True)
+            Uses cython parser.  Disable for debugging.
+            
+        force_linear (bool, default False)
+            This parser creates quadradic elements if available.  Set this to
+            true to always create linear elements
         
         """
         if not vtk_loaded:
-            raise Exception('Unable to load VTK module.  Cannot parse raw cdb data!')
+            raise Exception('Unable to load VTK module.  Cannot parse raw cdb data')
             return
             
            
         if self.CheckRaw():
-            raise Exception('Missing key data.  Cannot parse into unstructured grid.')            
+            raise Exception('Missing key data.  Cannot parse into unstructured grid')            
            
         # Convert to vtk style arrays
         if use_cython and cython_loaded:
-            cells, offset, cell_type, numref = CDBparser.Parse(self.raw)
+            cells, offset, cell_type, numref = CDBparser.Parse(self.raw,
+                                                               force_linear)
+            
         else:
-            cells, offset, cell_type, numref = PythonParser.Parse(self.raw)
+            cells, offset, cell_type, numref = PythonParser.Parse(self.raw, 
+                                                                  force_linear)
 
         # Create unstructured grid
-        self.uGrid = Utilities.MakeuGrid(offset, cells, cell_type,
-                                         self.raw['nodes'][:, :3])
+        uGrid = Utilities.MakeuGrid(offset, cells, cell_type,
+                                         self.raw['nodes'][:, :3].copy())
 
         # Store original ANSYS cell and node numbering
-        Utilities.AddPointScalars(self.uGrid, self.raw['nnum'], 'ANSYSnodenum')
+        Utilities.AddPointScalars(uGrid, self.raw['nnum'], 'ANSYSnodenum')
 
         # Add node components to unstructured grid
-        ibool = np.empty(self.uGrid.GetNumberOfPoints(), dtype=np.int8)
+        ibool = np.empty(uGrid.GetNumberOfPoints(), dtype=np.int8)
         for comp in self.raw['node_comps']:
             ibool[:] = 0 # reset component array
 
@@ -109,15 +122,20 @@ class Read(object):
             nodenum = numref[self.raw['node_comps'][comp]]
             
             ibool[nodenum] = 1
-            Utilities.AddPointScalars(self.uGrid, ibool, comp)
+            Utilities.AddPointScalars(uGrid, ibool, comp)
             
-        return self.uGrid
+        # Add tracker for original node numbering
+        Utilities.AddPointScalars(uGrid,
+                                  np.arange(uGrid.GetNumberOfPoints()),
+                                  'VTKorigID')
+            
+        return uGrid
         
         
     def ParseFEM(self, use_cython=True, raw=None):
         """ Parses raw data from cdb file to VTK format """
         if not vtk_loaded:
-            raise Exception('Unable to load VTK module.  Cannot parse raw cdb data!')
+            raise Exception('Unable to load VTK module.  Cannot parse raw cdb data')
             return
             
         if self.CheckRaw():
@@ -148,6 +166,11 @@ class Read(object):
             ibool[self.data['node_comps'][comp]] = 1          
             Utilities.AddPointScalars(self.uGrid, ibool, comp)
             
+        # Add tracker for original node numbering
+        Utilities.AddPointScalars(self.uGrid,
+                                  np.arange(self.uGrid.GetNumberOfPoints()),
+                                  'VTKorigID')
+                                  
         return self.data, self.uGrid, self.data['cellarr'], self.data['ncellpts']
         
         
@@ -159,17 +182,24 @@ class Read(object):
         
         """
         # Extract and add to uGrid.  Compress so that unused nodes are ignored
-        t = ExtractThickness(self.raw)[self.data['nodenum']]
-        Utilities.AddPointScalars(self.uGrid, t, 'thickness', False)
+#        t = ExtractThickness(self.raw)[self.data['nodenum']]
+
+        nnum = Utilities.GetPointScalars(self.uGrid, 'ANSYSnodenum')        
+        t = ExtractThickness(self.raw)[nnum]
         
+        Utilities.AddPointScalars(self.uGrid, t, 'thickness', False)
+        self.hasthickness = True
         
     def Plot(self):
         """ Plot unstructured grid """
         if not vtk_loaded:
-            raise Exception('VTK not loaded!')
+            raise Exception('VTK not loaded')
         
         if hasattr(self, 'uGrid'):
+            if not self.uGrid.GetNumberOfCells():
+                raise Exception('Unstructured grid contains no cells')
             Plotting.Plot(self.uGrid)
+            
         else:
             raise Exception('Unstructred grid not generated.  Run ParseVTK first.')
 
@@ -215,14 +245,16 @@ def ExtractThickness(raw):
     if np.any(maskC):
 
         # Reduce element matrix to maskC elements and first four nodes
-        elem = raw['elem'][maskC, :4] 
+        elem = raw['elem'][maskC, :8] 
         e_rcon = e_rcon[maskC]
 
-        # Work by getting the nodes matching each real constant
+        # Get the nodes of the elements matching each real constant
         for i in range(len(rnum)):
             # Get all surf154 elements matching the real constant
             idx = elem[e_rcon == rnum[i]] # get node indices
             
+            idx = idx[idx != -1]
+                      
             # Add thickness            
             t[idx] += rdat[i][6]
             a[idx] += 1
@@ -231,7 +263,4 @@ def ExtractThickness(raw):
         a[a == 0] = 1 # avoid divide by zero
         t /= a
     
-    # keep linear nodes
-    t = t[nnum]
-
     return t

@@ -14,12 +14,21 @@ cimport numpy as np
 np.import_array()
 
 import ctypes                   
-                   
+         
+# Type defintion for an unsigned 8-bit
+ctypedef unsigned char uint8
+          
 # VTK numbering for vtk cells
-cdef int vtkhexnum = 12
-cdef int vtkpyrnum = 14
-cdef int vtktetnum = 10
-cdef int vtkwegnum = 13
+cdef uint8 vtkhexnum = 12
+cdef uint8 vtkpyrnum = 14
+cdef uint8 vtktetnum = 10
+cdef uint8 vtkwegnum = 13
+                   
+# Quadradic elements
+cdef int vtkquadtetnum = 24 # VTK_QUADRATIC_TETRA = 24
+cdef int vtkquadpyrnum = 27 # VTK_QUADRATIC_PYRAMID = 27
+cdef int vtkquadwegnum = 26 # VTK_QUADRATIC_WEDGE = 26
+cdef int vtkquadhexnum = 25 # VTK_QUADRATIC_HEXAHEDRON = 25                        
                    
 # ANSYS element type definitions
 cdef int [4] typeA
@@ -37,20 +46,295 @@ cdef int [4] typeB
 typeB[0] = 92
 typeB[1] = 187
                    
-# Type defintion for an unsigned 8-bit
-ctypedef unsigned char uint8
+#==============================================================================
+# Store elements
+#==============================================================================
+cdef inline void StoreTet_TypeB(long [::1] offset, long *ecount, long *ccount, 
+                          long [::1] cells, uint8 [::1] cell_type,
+                          long [::1] numref, int [:, ::1] elem, int i, int lin):
+    """
+    Stores tetrahedral element in vtk arrays.  ANSYS elements are ordered
+    the same as vtk elements.
+    
+    VTK DOCUMENTATION
+    The tetrahedron is defined by the four points (0-3); where (0,1,2) is the
+    base of the tetrahedron which, using the right hand rule, forms a triangle
+    whose normal points in the direction of the fourth point.
+    
+    For quadradic
+    The cell includes a mid-edge node on each of the size edges of the 
+    tetrahedron. The ordering of the ten points defining the cell is point ids
+    (0-3,4-9) where ids 0-3 are the four tetra vertices; and point ids 4-9 are
+    the midedge nodes between
+    (0,1), (1,2), (2,0), (0,3), (1,3), and (2,3)
 
-def Parse(raw):
+    """
+    # Populate offset array
+    offset[ecount[0]] = ccount[0]
+    
+    if lin:
+        cells[ccount[0]] = 4; ccount[0] += 1
+        
+        # Populate cell array while renumbering nodes
+        for j in range(4):
+            cells[ccount[0]] = numref[elem[i, j]]; ccount[0] += 1
+        
+        # Populate cell type array
+        cell_type[ecount[0]] = vtktetnum
+        
+    else:
+        cells[ccount[0]] = 10; ccount[0] += 1
+        
+        # Populate cell array while renumbering nodes
+        for j in range(10):
+            cells[ccount[0]] = numref[elem[i, j]]; ccount[0] += 1
+        
+        # Populate cell type array
+        cell_type[ecount[0]] = vtkquadtetnum
+        
+    # increment element counter
+    ecount[0] += 1
+    
+
+cdef inline void StoreTet(long [::1] offset, long *ecount, long *ccount, 
+                          long [::1] cells, uint8 [::1] cell_type,
+                          long [::1] numref, int [:, ::1] elem, int i, int lin):
+    """
+    Stores tetrahedral element in vtk arrays.  ANSYS elements are ordered
+    the same as vtk elements.
+    
+    VTK DOCUMENTATION:
+    Linear
+    The tetrahedron is defined by the four points (0-3); where (0,1,2) is the
+    base of the tetrahedron which, using the right hand rule, forms a triangle
+    whose normal points in the direction of the fourth point.
+ 
+    Quadradic   
+    The cell includes a mid-edge node on each of the size edges of the 
+    tetrahedron. The ordering of the ten points defining the cell is point ids
+    (0-3,4-9) where ids 0-3 are the four tetra vertices; and point ids 4-9 are
+    the midedge nodes between
+    (0,1), (1,2), (2,0), (0,3), (1,3), and (2,3)
+
+    """
+    # Populate offset array
+    offset[ecount[0]] = ccount[0]
+    
+    # Populate cell type array and 
+    if lin:
+        cells[ccount[0]] = 4; ccount[0] += 1
+        cell_type[ecount[0]] = vtktetnum
+        
+    else:
+        cells[ccount[0]] = 10; ccount[0] += 1
+        cell_type[ecount[0]] = vtkquadtetnum
+        
+
+    # Populate cell array while renumbering nodes
+
+    # edge nodes
+    # [0, 1, 2, 2, 3, 3, 3, 3]
+    cells[ccount[0]] = numref[elem[i, 0]]; ccount[0] += 1
+    cells[ccount[0]] = numref[elem[i, 1]]; ccount[0] += 1
+    cells[ccount[0]] = numref[elem[i, 2]]; ccount[0] += 1
+    cells[ccount[0]] = numref[elem[i, 4]]; ccount[0] += 1
+        
+    # midside nodes
+    if not lin:
+        cells[ccount[0]] = numref[elem[i,  8]]; ccount[0] += 1
+        cells[ccount[0]] = numref[elem[i,  9]]; ccount[0] += 1
+        cells[ccount[0]] = numref[elem[i, 11]]; ccount[0] += 1
+        cells[ccount[0]] = numref[elem[i, 16]]; ccount[0] += 1
+        cells[ccount[0]] = numref[elem[i, 17]]; ccount[0] += 1
+        cells[ccount[0]] = numref[elem[i, 18]]; ccount[0] += 1
+
+    # increment element counter
+    ecount[0] += 1
+        
+
+cdef inline void StorePyr(long [::1] offset, long *ecount, long *ccount, 
+                          long [::1] cells, uint8 [::1] cell_type,
+                          long [::1] numref, int [:, ::1] elem, int i, int lin):
+    """
+    Stores pyramid element in vtk arrays.  ANSYS elements are ordered in the
+    same manner as VTK.    
+
+    VTK DOCUMENTATION
+    Linear Pyramid
+    The pyramid is defined by the five points (0-4) where (0,1,2,3) is the base
+    of the pyramid which, using the right hand rule, forms a quadrilaterial
+    whose normal points in the direction of the pyramid apex at vertex #4.
+    
+    Quadradic Pyramid
+    The ordering of the thirteen points defining the cell is point ids
+    (0-4,5-12) where point ids 0-4 are the five corner vertices of the pyramid;
+    followed by eight midedge nodes (5-12). Note that these midedge nodes 
+    correspond lie on the edges defined by:
+    (0,1), (1,2), (2,3), (3,0), (4,5), (5,6), (6,7), (7,4), (0,4), (1,5), (2,6), (3,7)
+    """
+
+    # Populate offset and cell type arrays
+    offset[ecount[0]] = ccount[0]
+    
+    # Populate cell array while renumbering nodes
+    if lin:
+        cells[ccount[0]] = 5; ccount[0] += 1
+        cell_type[ecount[0]] = vtkpyrnum
+    else:
+        cells[ccount[0]] = 13; ccount[0] += 1
+        cell_type[ecount[0]] = vtkquadpyrnum
+    
+    # edge nodes
+    # [0, 1, 2, 3, 4, X, X, X]
+    for k in range(5):
+        cells[ccount[0]] = numref[elem[i, k]]
+        ccount[0] += 1
+        
+    # Populate array
+    if not lin:
+        for k in range(8, 12):
+            cells[ccount[0]] = numref[elem[i, k]]
+            ccount[0] += 1
+            
+        for k in range(16, 20):
+            cells[ccount[0]] = numref[elem[i, k]]
+            ccount[0] += 1
+    
+    ecount[0] += 1
+
+        
+cdef inline void StoreWeg(long [::1] offset, long *ecount, long *ccount, 
+                          long [::1] cells, uint8 [::1] cell_type,
+                          long [::1] numref, int [:, ::1] elem, int i, int lin):
+    """
+    Stores wedge element in vtk arrays.  ANSYS elements are ordered differently
+    than vtk elements.  ANSYS orders counter-clockwise and VTK orders clockwise
+    
+    VTK DOCUMENTATION
+    Linear Wedge
+    The wedge is defined by the six points (0-5) where (0,1,2) is the base of
+    the wedge which, using the right hand rule, forms a triangle whose normal
+    points outward (away from the triangular face (3,4,5)).
+
+    Quadradic Wedge
+    The ordering of the fifteen points defining the cell is point ids
+    (0-5,6-14) where point ids 0-5 are the six corner vertices of the wedge,
+    defined analogously to the six points in vtkWedge (points (0,1,2) form the
+    base of the wedge which, using the right hand rule, forms a triangle whose
+    normal points away from the triangular face (3,4,5)); followed by nine
+    midedge nodes (6-14). Note that these midedge nodes correspond lie on the
+    edges defined by :
+    (0,1), (1,2), (2,0), (3,4), (4,5), (5,3), (0,3), (1,4), (2,5)
+    """
+
+    # Populate offset and cell type arrays
+    offset[ecount[0]] = ccount[0]
+    
+    if lin:
+        cells[ccount[0]] = 6; ccount[0] += 1
+        cell_type[ecount[0]] = vtkwegnum
+
+    else:
+        cells[ccount[0]] = 15; ccount[0] += 1
+        cell_type[ecount[0]] = vtkquadwegnum
+
+    # Populate cell array while renumbering nodes
+    # [0, 1, 2, 2, 3, 4, 5, 5]
+    cells[ccount[0]] = numref[elem[i, 2]]; ccount[0] += 1
+    cells[ccount[0]] = numref[elem[i, 1]]; ccount[0] += 1
+    cells[ccount[0]] = numref[elem[i, 0]]; ccount[0] += 1
+    cells[ccount[0]] = numref[elem[i, 6]]; ccount[0] += 1
+    cells[ccount[0]] = numref[elem[i, 5]]; ccount[0] += 1
+    cells[ccount[0]] = numref[elem[i, 4]]; ccount[0] += 1
+
+    if not lin:
+        # midside nodes
+        cells[ccount[0]] = numref[elem[i,  9]]; ccount[0] += 1
+        cells[ccount[0]] = numref[elem[i,  8]]; ccount[0] += 1
+        cells[ccount[0]] = numref[elem[i, 11]]; ccount[0] += 1
+        cells[ccount[0]] = numref[elem[i, 13]]; ccount[0] += 1
+        cells[ccount[0]] = numref[elem[i, 12]]; ccount[0] += 1
+        cells[ccount[0]] = numref[elem[i, 15]]; ccount[0] += 1
+        cells[ccount[0]] = numref[elem[i, 18]]; ccount[0] += 1
+        cells[ccount[0]] = numref[elem[i, 17]]; ccount[0] += 1
+        cells[ccount[0]] = numref[elem[i, 16]]; ccount[0] += 1
+
+    ecount[0] += 1
+    
+
+
+
+cdef inline void StoreHex(long [::1] offset, long *ecount, long *ccount, 
+                          long [::1] cells, uint8 [::1] cell_type,
+                          long [::1] numref, int [:, ::1] elem, int i, int lin):
+    """
+    Stores hexahedral element in vtk arrays.  ANSYS elements are ordered in the
+    same manner as VTK.    
+    
+    VTK DOCUMENTATION
+    Linear Hexahedral
+    The hexahedron is defined by the eight points (0-7) where (0,1,2,3) is the
+    base of the hexahedron which, using the right hand rule, forms a
+    quadrilaterial whose normal points in the direction of the opposite face
+    (4,5,6,7).
+
+    Quadradic Hexahedral
+    The ordering of the twenty points defining the cell is point ids
+    (0-7, 8-19) where point ids 0-7 are the eight corner vertices of the cube;
+    followed by twelve midedge nodes (8-19)
+    Note that these midedge nodes correspond lie on the edges defined by:
+    Midside   Edge nodes
+    8         (0, 1)
+    9         (1, 2)
+    10        (2, 3)
+    11        (3, 0)
+    12        (4, 5)
+    13        (5, 6)
+    14        (6, 7)
+    15        (7, 4)
+    16        (0, 4)
+    17        (1, 5)
+    18        (2, 6)
+    19        (3, 7)
+
+    """
+
+    # Populate offset, cell type, and cell arrays while renumbering nodes
+    offset[ecount[0]] = ccount[0]
+    if lin:
+        cells[ccount[0]] = 8; ccount[0] += 1
+        cell_type[ecount[0]] = vtkhexnum
+
+        for k in range(8):
+            cells[ccount[0]] = numref[elem[i, k]]
+            ccount += 1
+
+    else:
+        cells[ccount[0]] = 20; ccount[0] += 1
+        cell_type[ecount[0]] = vtkquadhexnum
+        
+        for k in range(20):
+            cells[ccount[0]] = numref[elem[i, k]]
+            ccount[0] += 1
+
+    ecount[0] += 1
+        
+        
+#==============================================================================
+# Parse raw data
+#==============================================================================
+def Parse(raw, pyforce_linear):
     """
     Parses raw cdb data from downstream conversion to a vtk unstructured grid
     """
+    cdef int force_linear = pyforce_linear    
     
     cdef long [:, ::1] ekey = raw['ekey']
     cdef int [:, ::1] elem = raw['elem']
     cdef int [::1] etype = raw['etype']
     cdef int [::1] nnum = raw['nnum']
     
-    cdef int i, j, k
+    cdef int i, j, k, lin
     cdef int nelem = elem.shape[0]
     cdef int nnode = nnum.shape[0]
 
@@ -71,7 +355,7 @@ def Parse(raw):
     cdef uint8 [::1] cell_type = np.empty(nelem, dtype='uint8')
     
     # different array sizes depending on midside nodes
-    cdef long [::1] cells = np.empty(nelem*9, ctypes.c_long)  # max cell is 8 and header is 1
+    cdef long [::1] cells = np.empty(nelem*21, ctypes.c_long)  # max cell is 20 and header is 1
     
     # Find the highest node number
     cdef int maxnodenum = 0
@@ -92,96 +376,50 @@ def Parse(raw):
     for i in range(nelem):
         for j in range(4):
             if elem_type[etype[i]] == typeA[j]:
+                # Set to read quadradic nodes
+                if force_linear:
+                    lin = 1
+                
+                # Check if linear (missing midside nodes)
+                lin = elem[i, 8] == -1
+                    
                 ############ Read element typeA ############
                 # Determine element type through logic
                 if elem[i, 6] != elem[i, 7]: # check if hexahedral
-                    # Populate offset array
-                    offset[ecount] = ccount
-                
-                    # Populate cell array while renumbering nodes
-                    cells[ccount] = 8; ccount += 1
-                    for k in range(8):
-                        cells[ccount] = numref[elem[i, k]]
-                        ccount += 1
-                        
-                    # Populate cell type array
-                    cell_type[ecount] = vtkhexnum
-                    
+                    StoreHex(offset, &ecount, &ccount, cells, cell_type, numref,
+                             elem, i, lin)
                     
                 elif elem[i, 5] != elem[i, 6]: # check if wedge
-                    # Populate offset array
-                    offset[ecount] = ccount  
-                    
-                    # Populate cell array while renumbering nodes
-                    # [0, 1, 2, 2, 3, 4, 5, 5]
-                    cells[ccount] = 6; ccount += 1
-                    cells[ccount] = numref[elem[i, 2]]; ccount += 1
-                    cells[ccount] = numref[elem[i, 1]]; ccount += 1
-                    cells[ccount] = numref[elem[i, 0]]; ccount += 1
-                    cells[ccount] = numref[elem[i, 6]]; ccount += 1
-                    cells[ccount] = numref[elem[i, 5]]; ccount += 1
-                    cells[ccount] = numref[elem[i, 4]]; ccount += 1
-
-                    # Populate cell type array
-                    cell_type[ecount] = vtkwegnum
-                    
+                    StoreWeg(offset, &ecount, &ccount, cells, cell_type, numref,
+                             elem, i, lin)
                     
                 elif elem[i, 2] != elem[i, 3]: # check if pyramid
-                    # Populate offset array
-                    offset[ecount] = ccount  
-                    
-                    # Populate cell array while renumbering nodes
-                    # [0, 1, 2, 3, 4, 4, 4, 4]
-                    cells[ccount] = 5; ccount += 1
-                    for k in range(5):
-                        cells[ccount] = numref[elem[i, k]]
-                        ccount += 1
-                        
-                    # Populate cell type array
-                    cell_type[ecount] = vtkpyrnum
-                    
+                    StorePyr(offset, &ecount, &ccount, cells, cell_type, numref,
+                             elem, i, lin)
                     
                 else: # if tetrahedral
-                    # Populate offset array
-                    offset[ecount] = ccount
-                    
-                    # Populate cell array while renumbering nodes
-                    # [0, 1, 2, 2, 3, 3, 3, 3]        
-                    cells[ccount] = 4; ccount += 1
-                    cells[ccount] = numref[elem[i, 0]]; ccount += 1
-                    cells[ccount] = numref[elem[i, 1]]; ccount += 1
-                    cells[ccount] = numref[elem[i, 2]]; ccount += 1
-                    cells[ccount] = numref[elem[i, 4]]; ccount += 1
-                        
-                    # Populate cell type array
-                    cell_type[ecount] = vtktetnum
-                    
-                # Increment element counter
-                ecount += 1   
-                
+                    StoreTet(offset, &ecount, &ccount, cells, cell_type, numref,
+                             elem, i, lin)
+
                 break # Continue to next element
                 
         # Test for element type B
         for j in range(2):
             if elem_type[etype[i]] == typeB[j]:
-                ############ Read element typeB ############
-                # Populate offset array
-                offset[ecount] = ccount  
-    
-                # Populate cell array while renumbering nodes
-                cells[ccount] = 4; ccount += 1
-                for k in range(4):
-                    cells[ccount] = numref[elem[i, k]]
-                    ccount += 1
+                if force_linear:
+                    lin = 1
+                elif elem[i, 8] != -1:
+                    lin = 0
                     
-                # Populate cell type array
-                cell_type[ecount] = vtktetnum
-                
-                # Increment element counter
-                ecount += 1
+                StoreTet_TypeB(offset, &ecount, &ccount, cells, cell_type, 
+                               numref, elem, i, lin)
+                               
+                break # Continue to next element
+                    
                     
     # Return spliced arrays
-    return np.asarray(cells[:ccount]), np.asarray(offset[:ecount]), np.asarray(cell_type[:ecount]), np.asarray(numref)
+    return np.asarray(cells[:ccount]), np.asarray(offset[:ecount]), \
+           np.asarray(cell_type[:ecount]), np.asarray(numref)
     
     
 #==============================================================================
@@ -548,9 +786,9 @@ def ParseForFEM(raw):
     ecount = 0 # element number counter
     edgenum = 0
     for i in range(nelem):
+        ############ Check if element type A ############
         for j in range(4):
             if elem_type[etype[i]] == typeA[j]:
-                ############ Read element typeA ############
                 # Determine element type through logic
                 if elem[i, 6] != elem[i, 7]: # check if hexahedral
                     # Populate offset array
@@ -780,27 +1018,6 @@ def ParseForFEM(raw):
         if len(t):
             node_comps[comp] = t
     
-    # No idea why the following won't do the same thing as above!
-#    cdef int [::1] nodecomp
-#    cdef long [::1] temparr = np.empty(nnode, ctypes.c_long)
-#    for comp in raw['node_comps']:
-#        
-#        # Convert from numpy array to memory view array
-#        nodecomp = raw['node_comps'][comp]
-#
-#        c = 0 # reset counter
-#        for i in range(nodecomp.size):
-#            # Get index in "used" indicies
-#            node = numref[nodecomp[i]]
-#            # check if node is in use
-#            if node != -1:
-#                temparr[c] = node
-#                c += 1
-#            
-#        # Store if component had nodes in the reduced unstructured grid
-#        if c:
-#            node_comps[comp] = np.asarray(temparr[:c])
-                    
     # Return spliced arrays
     return {'cells': np.asarray(cells[:ccount]),
             'offset': np.asarray(offset[:ecount]),
