@@ -224,7 +224,7 @@ class Read(object):
 
         if not self.uGrid.GetNumberOfCells():
             raise Exception('Unstructured grid contains no cells')
-        Plotting.Plot(self.uGrid)
+        Plotting.Plot(grid)
 
 
     def CheckRaw(self):
