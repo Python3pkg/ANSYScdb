@@ -1,4 +1,7 @@
-__version__ = '0.13.2'
+__version__ = '0.14'
 from . import *
 
-from CDB_Reader import Read
+try:
+    from CDB_Reader import Read
+except:
+    pass

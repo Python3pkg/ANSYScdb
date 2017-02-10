@@ -1,10 +1,10 @@
-# cython: boundscheck=False
-# cython: wraparound=False
-# cython: cdivision=True
 """ 
 Cython module to parse raw data from an ANSYS cdb file.
 
 """
+# cython: boundscheck=False
+# cython: wraparound=False
+# cython: cdivision=True
 
 import numpy as np
 cimport numpy as np
@@ -307,7 +307,7 @@ cdef inline void StoreHex(long [::1] offset, long *ecount, long *ccount,
 
         for k in range(8):
             cells[ccount[0]] = numref[elem[i, k]]
-            ccount += 1
+            ccount[0] += 1
 
     else:
         cells[ccount[0]] = 20; ccount[0] += 1
@@ -362,10 +362,21 @@ def Parse(raw, pyforce_linear):
     for i in range(nnode):
         if nnum[i] > maxnodenum:
             maxnodenum = nnum[i]
-    
+            
     # Create reference array for node renumbering
     cdef long n
-    cdef long [::1] numref = np.empty(maxnodenum + 1, ctypes.c_long)
+    cdef long [::1] numref = np.empty(maxnodenum + 2, ctypes.c_long)
+#    numref[0]  = -1 # elements that have missing nodes written as a "0" in cdb
+#
+#    # elements that have missing nodes, but were written such that those
+#    # missing nodes were at the end of the line and were simply not written
+#    # will be stored as a -1
+#    numref[-1] = -1
+
+    # forcing all to -1 to avoid null references
+    numref[:] = -1
+          
+
     for n in range(nnode):
         numref[nnum[n]] = n
     
@@ -379,16 +390,16 @@ def Parse(raw, pyforce_linear):
                 # Set to read quadradic nodes
                 if force_linear:
                     lin = 1
-                
-                # Check if linear (missing midside nodes)
-                lin = elem[i, 8] == -1
+                else:
+                    # Check if linear (missing midside nodes)
+                    lin = elem[i, 8] == -1
                     
                 ############ Read element typeA ############
                 # Determine element type through logic
                 if elem[i, 6] != elem[i, 7]: # check if hexahedral
                     StoreHex(offset, &ecount, &ccount, cells, cell_type, numref,
                              elem, i, lin)
-                    
+
                 elif elem[i, 5] != elem[i, 6]: # check if wedge
                     StoreWeg(offset, &ecount, &ccount, cells, cell_type, numref,
                              elem, i, lin)

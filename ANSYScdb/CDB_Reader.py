@@ -106,12 +106,32 @@ class Read(object):
             cells, offset, cell_type, numref = PythonParser.Parse(self.raw, 
                                                                   force_linear)
 
+        # Check for missing midside nodes
+        if force_linear:
+            nodes = self.raw['nodes'][:, :3].copy()
+            nnum = self.raw['nnum']
+        else:
+            mask = cells == -1
+#            if np.any(mask):
+#                warnings.warn('ANSYS archive file missing mid-side nodes')
+            
+            nextra = mask.sum()
+            maxnum = numref.max() + 1
+            cells[mask] = np.arange(maxnum, maxnum + nextra)
+            
+            nnodes = self.raw['nodes'].shape[0]
+            nodes = np.empty((nnodes + nextra, 3))
+            nodes[:] = 0
+            nodes[:nnodes] = self.raw['nodes'][:, :3]
+            
+            # Add extra node numbers
+            nnum = np.hstack((self.raw['nnum'], np.ones(nextra, np.int32)*-1))
+            
         # Create unstructured grid
-        uGrid = Utilities.MakeuGrid(offset, cells, cell_type,
-                                         self.raw['nodes'][:, :3].copy())
+        uGrid = Utilities.MakeuGrid(offset, cells, cell_type, nodes)
 
         # Store original ANSYS cell and node numbering
-        Utilities.AddPointScalars(uGrid, self.raw['nnum'], 'ANSYSnodenum')
+        Utilities.AddPointScalars(uGrid, nnum, 'ANSYSnodenum')
 
         # Add node components to unstructured grid
         ibool = np.empty(uGrid.GetNumberOfPoints(), dtype=np.int8)
@@ -181,9 +201,6 @@ class Read(object):
         Assumes that thickness is stored as SURF154 elements
         
         """
-        # Extract and add to uGrid.  Compress so that unused nodes are ignored
-#        t = ExtractThickness(self.raw)[self.data['nodenum']]
-
         nnum = Utilities.GetPointScalars(self.uGrid, 'ANSYSnodenum')        
         t = ExtractThickness(self.raw)[nnum]
         
