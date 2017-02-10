@@ -46,7 +46,7 @@ setup(
     packages = ['ANSYScdb', 'ANSYScdb.Tests'],
 
     # Version
-    version='0.14',
+    version='0.14.1',
 
     description='Loads ANSYS cdb files',
     long_description=open('README.rst').read(),
@@ -85,6 +85,10 @@ setup(
                             'ANSYScdb/cython/reader.c'],
                            extra_compile_args=cmp_arg,
                            language='c',),
+
+                 Extension("ANSYScdb._relaxmidside", 
+                           ["ANSYScdb/cython/_relaxmidside.pyx"],
+                           language='c'),
 
                 ],
                            

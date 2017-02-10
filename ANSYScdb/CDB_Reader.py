@@ -31,6 +31,7 @@ except:
 # Cython modules
 try:
     from ANSYScdb import _reader
+    from ANSYScdb import _relaxmidside
     from ANSYScdb import CDBparser
     cython_loaded = True
 except:
@@ -107,25 +108,29 @@ class Read(object):
                                                                   force_linear)
 
         # Check for missing midside nodes
-        if force_linear:
+        if force_linear or np.all(cells != -1):
             nodes = self.raw['nodes'][:, :3].copy()
             nnum = self.raw['nnum']
         else:
             mask = cells == -1
-#            if np.any(mask):
-#                warnings.warn('ANSYS archive file missing mid-side nodes')
             
             nextra = mask.sum()
             maxnum = numref.max() + 1
             cells[mask] = np.arange(maxnum, maxnum + nextra)
             
             nnodes = self.raw['nodes'].shape[0]
-            nodes = np.empty((nnodes + nextra, 3))
-            nodes[:] = 0
+            nodes = np.zeros((nnodes + nextra, 3))
             nodes[:nnodes] = self.raw['nodes'][:, :3]
             
             # Add extra node numbers
             nnum = np.hstack((self.raw['nnum'], np.ones(nextra, np.int32)*-1))
+            
+            if cython_loaded:
+                # Set new midside nodes directly between their edge nodes
+                temp_nodes = nodes.copy()
+                _relaxmidside.ResetMidside(cells, temp_nodes)
+                nodes[nnodes:] = temp_nodes[nnodes:]
+                
             
         # Create unstructured grid
         uGrid = Utilities.MakeuGrid(offset, cells, cell_type, nodes)
@@ -149,6 +154,7 @@ class Read(object):
                                   np.arange(uGrid.GetNumberOfPoints()),
                                   'VTKorigID')
         self.vtkuGrid = uGrid
+        
         return uGrid
         
         
@@ -222,7 +228,7 @@ class Read(object):
         else:
             raise Exception('Unstructred grid not generated.  Run ParseVTK or ParseFEM first.')
 
-        if not self.uGrid.GetNumberOfCells():
+        if not grid.GetNumberOfCells():
             raise Exception('Unstructured grid contains no cells')
         Plotting.Plot(grid)
 

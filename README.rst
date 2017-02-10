@@ -1,5 +1,5 @@
 ANSYScdb v0.14
-========
+==============
 
 Python/Cython module to convert ANSYS CDB ASCII block files to numpy and
 vtk unstructured grid objects.

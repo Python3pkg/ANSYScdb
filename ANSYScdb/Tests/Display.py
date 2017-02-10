@@ -19,8 +19,7 @@ def HexBeam():
 
     # Parse into unstuctured grid
     cdb.ParseVTK()
-    
-    print(cdb.uGrid)
+    print(cdb.vtkuGrid)
 
     # Plot unstuctured grid
     cdb.Plot()
@@ -41,7 +40,7 @@ def TetBeam():
 
     # Parse into unstuctured grid
     cdb.ParseVTK()
-    print(cdb.uGrid)
+    print(cdb.vtkuGrid)
 
     # Plot unstuctured grid
     cdb.Plot()
