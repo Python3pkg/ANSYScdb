@@ -148,7 +148,7 @@ class Read(object):
         Utilities.AddPointScalars(uGrid,
                                   np.arange(uGrid.GetNumberOfPoints()),
                                   'VTKorigID')
-            
+        self.vtkuGrid = uGrid
         return uGrid
         
         
@@ -207,18 +207,24 @@ class Read(object):
         Utilities.AddPointScalars(self.uGrid, t, 'thickness', False)
         self.hasthickness = True
         
+
     def Plot(self):
         """ Plot unstructured grid """
         if not vtk_loaded:
             raise Exception('VTK not loaded')
+
+        if hasattr(self, 'vtkuGrid'):
+            grid = self.vtkuGrid
+
+        elif hasattr(self, 'uGrid'):
+            grid = self.uGrid
         
-        if hasattr(self, 'uGrid'):
-            if not self.uGrid.GetNumberOfCells():
-                raise Exception('Unstructured grid contains no cells')
-            Plotting.Plot(self.uGrid)
-            
         else:
-            raise Exception('Unstructred grid not generated.  Run ParseVTK first.')
+            raise Exception('Unstructred grid not generated.  Run ParseVTK or ParseFEM first.')
+
+        if not self.uGrid.GetNumberOfCells():
+            raise Exception('Unstructured grid contains no cells')
+        Plotting.Plot(self.uGrid)
 
 
     def CheckRaw(self):
