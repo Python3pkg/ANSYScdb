@@ -2,7 +2,7 @@
 """
 Tests/Examples to load cdb files.
 """
-
+from __future__ import print_function
 
 from os.path import dirname, join, realpath
 from ANSYScdb import CDB_Reader

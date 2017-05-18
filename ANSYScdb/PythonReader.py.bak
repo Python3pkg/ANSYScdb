@@ -482,6 +482,6 @@ def ComponentInterperter(fixed):
         if fixed[i] > 0: # Append if positive
             f_new.append(fixed[i])
         else: # otherwise, append list
-            f_new.append(list(range(abs(fixed[i - 1]) + 1, abs(fixed[i]) + 1)))
+            f_new.append(range(abs(fixed[i - 1]) + 1, abs(fixed[i]) + 1))
     
     return np.hstack(f_new)

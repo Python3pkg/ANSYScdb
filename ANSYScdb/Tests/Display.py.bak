@@ -2,8 +2,7 @@
 """
 Tests/Examples to load cdb files.
 """
-
-
+from __future__ import print_function
 from os.path import dirname, join, realpath
 from ANSYScdb import CDB_Reader
 
@@ -18,15 +17,14 @@ def HexBeam():
     # Create cdb object
     cdb = CDB_Reader.Read(filename)
 
-    print('Raw cdb loaded with the following keys:')
-    for key in cdb.raw:
-        print(key, end='')
-        print(':\tWith shape: ', end='')
-        try:
-            print(cdb.raw[key].shape)
-        except:
-            print('')
+    # Parse into unstuctured grid
+    cdb.ParseVTK()
+    print(cdb.vtkuGrid)
 
+    # Plot unstuctured grid
+    cdb.Plot()
+    
+    # Return cdb object for use to inspect
     return cdb
     
     
@@ -40,13 +38,12 @@ def TetBeam():
     # Create cdb object
     cdb = CDB_Reader.Read(filename)
 
-    print('Raw cdb loaded with the following keys:')
-    for key in cdb.raw:
-        print(key, end='')
-        print(':\tWith shape: ', end='')
-        try:
-            print(cdb.raw[key].shape)
-        except:
-            print('')
+    # Parse into unstuctured grid
+    cdb.ParseVTK()
+    print(cdb.vtkuGrid)
 
+    # Plot unstuctured grid
+    cdb.Plot()
+    
+    # Return cdb object for use to inspect
     return cdb
